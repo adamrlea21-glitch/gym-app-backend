@@ -11,15 +11,17 @@ app = FastAPI(title="Gym App API v2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://health-3n1484ovs-adam-leas-projects.vercel.app",
-        "https://health-app-nine-pi.vercel.app",  # keep if you use this alias
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://health-3n1484ovs-adam-leas-projects.vercel.app",
+        "https://health-app-nine-pi.vercel.app",
     ],
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 app.include_router(auth_router)
