@@ -750,8 +750,6 @@ async def analytics_weekly_review(
         .where(
             WorkoutSession.user_id == user.id,
             WorkoutSession.status == "finished",
-            WorkoutSet.weight_kg.isnot(None),
-            WorkoutSet.reps.isnot(None),
             WorkoutSession.ended_at.isnot(None),
             WorkoutSession.ended_at >= func.datetime("now", "-7 days"),
         )
@@ -774,8 +772,6 @@ async def analytics_weekly_review(
         .where(
             WorkoutSession.user_id == user.id,
             WorkoutSession.status == "finished",
-            WorkoutSet.weight_kg.isnot(None),
-            WorkoutSet.reps.isnot(None),
             WorkoutSession.ended_at.isnot(None),
             WorkoutSession.ended_at >= func.datetime("now", "-7 days"),
         )
@@ -846,7 +842,7 @@ async def analytics_volume_last_7_days(
     res = await db.execute(
         select(
             WorkoutExercise.name.label("exercise"),
-            func.sum((WorkoutSet.weight_kg * WorkoutSet.reps)).label("volume"),
+            func.sum(func.coalesce(WorkoutSet.weight_kg, 0) * func.coalesce(WorkoutSet.reps, 0)).label("volume"),
             func.count(WorkoutSet.id).label("sets"),
         )
         .select_from(WorkoutSet)
@@ -855,8 +851,6 @@ async def analytics_volume_last_7_days(
         .where(
             WorkoutSession.user_id == user.id,
             WorkoutSession.status == "finished",
-            WorkoutSet.weight_kg.isnot(None),
-            WorkoutSet.reps.isnot(None),
             WorkoutSession.ended_at.isnot(None),
             WorkoutSession.ended_at >= func.datetime("now", "-7 days"),
         )
@@ -1084,7 +1078,7 @@ async def analytics_exercise_weekly_max_weight(
     # We group by week_start and take max weight that week.
     res = await db.execute(
         select(
-            func.date(WorkoutSession.ended_at, "weekday 1", "-7 days").label("week_start"),
+            func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").label("week_start"),
             func.max(WorkoutSet.weight_kg).label("max_weight"),
         )
         .select_from(WorkoutSet)
@@ -1097,8 +1091,8 @@ async def analytics_exercise_weekly_max_weight(
             WorkoutSet.weight_kg.isnot(None),
             WorkoutSession.ended_at.isnot(None),
         )
-        .group_by(func.date(WorkoutSession.ended_at, "weekday 1", "-7 days"))
-        .order_by(func.date(WorkoutSession.ended_at, "weekday 1", "-7 days").asc())
+        .group_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1"))
+        .order_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").asc())
     )
 
     rows = res.all()
@@ -1136,9 +1130,9 @@ async def analytics_exercise_weekly_volume(
 
     res = await db.execute(
         select(
-            func.date(WorkoutSession.ended_at, "weekday 1", "-7 days").label("week_start"),
-            func.sum(WorkoutSet.weight_kg * WorkoutSet.reps).label("volume"),
-            func.sum(WorkoutSet.reps).label("total_reps"),
+            func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").label("week_start"),
+            func.sum(func.coalesce(WorkoutSet.weight_kg, 0) * func.coalesce(WorkoutSet.reps, 0)).label("volume"),
+            func.sum(func.coalesce(WorkoutSet.reps, 0)).label("total_reps"),
             func.count(WorkoutSet.id).label("sets"),
         )
         .select_from(WorkoutSet)
@@ -1148,12 +1142,10 @@ async def analytics_exercise_weekly_volume(
             WorkoutSession.user_id == user.id,
             WorkoutSession.status == "finished",
             WorkoutExercise.name == ex.name,
-            WorkoutSet.weight_kg.isnot(None),
-            WorkoutSet.reps.isnot(None),
             WorkoutSession.ended_at.isnot(None),
         )
-        .group_by(func.date(WorkoutSession.ended_at, "weekday 1", "-7 days"))
-        .order_by(func.date(WorkoutSession.ended_at, "weekday 1", "-7 days").asc())
+        .group_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1"))
+        .order_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").asc())
     )
 
     rows = res.all()
