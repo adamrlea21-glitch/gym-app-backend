@@ -1128,10 +1128,15 @@ async def analytics_exercise_weekly_volume(
     if not ex:
         return {"found": False, "detail": "Exercise not found"}
 
+    # Compute week bucket once and filter out NULL buckets (prevents SQLite date() weirdness -> 500)
+    week_bucket = func.date(WorkoutSession.ended_at, "-6 days", "weekday 1")
+
     res = await db.execute(
         select(
-            func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").label("week_start"),
-            func.sum(func.coalesce(WorkoutSet.weight_kg, 0) * func.coalesce(WorkoutSet.reps, 0)).label("volume"),
+            week_bucket.label("week_start"),
+            func.sum(
+                func.coalesce(WorkoutSet.weight_kg, 0) * func.coalesce(WorkoutSet.reps, 0)
+            ).label("volume"),
             func.sum(func.coalesce(WorkoutSet.reps, 0)).label("total_reps"),
             func.count(WorkoutSet.id).label("sets"),
         )
@@ -1143,9 +1148,10 @@ async def analytics_exercise_weekly_volume(
             WorkoutSession.status == "finished",
             WorkoutExercise.name == ex.name,
             WorkoutSession.ended_at.isnot(None),
+            week_bucket.isnot(None),  # ✅ KEY FIX
         )
-        .group_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1"))
-        .order_by(func.date(WorkoutSession.ended_at, "-6 days", "weekday 1").asc())
+        .group_by(week_bucket)
+        .order_by(week_bucket.asc())
     )
 
     rows = res.all()
@@ -1164,6 +1170,7 @@ async def analytics_exercise_weekly_volume(
             if r.week_start is not None
         ],
     }
+
 
 
 @router.get("/history")
